@@ -3,8 +3,8 @@
 #include <pthread.h>
 #include <windows.h>
 
-#define N 4 // µ{§Ç¼Æ¶q
-#define MAX_TIME 50 // ¥Ì¯S¹Ï³Ì¤j®É¶¡
+#define N 4 // ç¨‹åºæ•¸é‡
+#define MAX_TIME 50 // ç”˜ç‰¹åœ–æœ€å¤§æ™‚é–“
 
 pthread_mutex_t queue_mutex;
 pthread_mutex_t proc_info_mutex;
@@ -12,7 +12,7 @@ pthread_mutex_t proc_info_mutex;
 pthread_cond_t process_available;
 pthread_cond_t time_advanced;
 
-//¥ş°ìÅÜ¼Æ
+//å…¨åŸŸè®Šæ•¸
 int current_time = 0;
 int all_processes_submitted = 0;
 volatile int simulation_active = 1;
@@ -21,20 +21,20 @@ void setColor(int color) {
     SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), color);
 }
 
-// µ{§Ç¸ê®Æµ²ºc
+// ç¨‹åºè³‡æ–™çµæ§‹
 typedef struct {
-    int pid;        // µ{§Ç ID
-    char state;     // ª¬ºA¡]¥¼¨Ï¥Î¡^
-    int arrival;    // ©è¹F®É¶¡
-    int burst;      // °õ¦æ®É¶¡
-    int priority;   // Àu¥ıÅv
-    int waiting;    // µ¥«İ®É¶¡
-    int turnaround; // ©PÂà®É¶¡
+    int pid;        // ç¨‹åº ID
+    char state;     // ç‹€æ…‹ï¼ˆæœªä½¿ç”¨ï¼‰
+    int arrival;    // æŠµé”æ™‚é–“
+    int burst;      // åŸ·è¡Œæ™‚é–“
+    int priority;   // å„ªå…ˆæ¬Š
+    int waiting;    // ç­‰å¾…æ™‚é–“
+    int turnaround; // å‘¨è½‰æ™‚é–“
 } process;
 
-// ªì©l¤Æµ{§Ç¸ê®Æ
-process procInfo[] = { /* ªì©l¤Æ¦U­Óµ{§Çªº¤u§@¸ê°T */
-    {3, '-', 0, 3, 4, 0, 0}, //µ{§ÇÃÑ§O½X,µ{§Ç·í¤Uª¬ºA,µ{§Ç©è¹F¥[¤JReady Queueªº®É¨è,µ{§Ç»İ¨Ï¥ÎCPUªº®É¶¡(³æ¦ì¬°²@¬í),µ{§ÇªºÀu¥ıÅv,µ{§Çµ¥«İ®É¶¡,µ{§Ç©PÂà®É¶¡
+// åˆå§‹åŒ–ç¨‹åºè³‡æ–™
+process procInfo[] = { /* åˆå§‹åŒ–å„å€‹ç¨‹åºçš„å·¥ä½œè³‡è¨Š */
+    {3, '-', 0, 3, 4, 0, 0}, //ç¨‹åºè­˜åˆ¥ç¢¼,ç¨‹åºç•¶ä¸‹ç‹€æ…‹,ç¨‹åºæŠµé”åŠ å…¥Ready Queueçš„æ™‚åˆ»,ç¨‹åºéœ€ä½¿ç”¨CPUçš„æ™‚é–“(å–®ä½ç‚ºæ¯«ç§’),ç¨‹åºçš„å„ªå…ˆæ¬Š,ç¨‹åºç­‰å¾…æ™‚é–“,ç¨‹åºå‘¨è½‰æ™‚é–“
     {2, '-', 0, 6, 2, 0, 0}, //    pid   ,    state   ,           arrival           ,               brust           ,   priority ,   waitimg  ,  turnaround
     {1, '-',13, 8, 1, 0, 0},
     {4, '-', 2, 2, 3, 0, 0}
@@ -42,11 +42,11 @@ process procInfo[] = { /* ªì©l¤Æ¦U­Óµ{§Çªº¤u§@¸ê°T */
 
 int ready_queue[N];
 int q_front = 0, q_rear = 0;
-int gantt_chart[MAX_TIME]; //¥Ì¯S¹Ï
-int g_index = 0; //¥Ì¯S¹Ï¯Á¤Ş
-int sorted_indices[N]; //±Æ§Ç->­Y©è¹F®É¶¡¬Û¦P«h¨Ì·Ó PID
+int gantt_chart[MAX_TIME]; //ç”˜ç‰¹åœ–
+int g_index = 0; //ç”˜ç‰¹åœ–ç´¢å¼•
+int sorted_indices[N]; //æ’åº->è‹¥æŠµé”æ™‚é–“ç›¸åŒå‰‡ä¾ç…§ PID
 
-//¦L¥XReadyQueue
+//å°å‡ºReadyQueue
 void printQueue() {
     printf("[");
     for (int i = q_front; i < q_rear; i++) {
@@ -56,7 +56,7 @@ void printQueue() {
     printf("]");
 }
 
-// §ä´Nºü¦î¦C¤¤Àu¥ıÅv³Ì°ªµ{§Ç(Àu¥ıÅv­È³Ì¤p)¦ì¸m
+// æ‰¾å°±ç·’ä½‡åˆ—ä¸­å„ªå…ˆæ¬Šæœ€é«˜ç¨‹åº(å„ªå…ˆæ¬Šå€¼æœ€å°)ä½ç½®
 int find_highest_priority_process() {
     int highest_idx = q_front;
     for (int i = q_front + 1; i < q_rear; i++) {
@@ -69,19 +69,19 @@ int find_highest_priority_process() {
     return highest_idx;
 }
 
-//PS±Æµ{
+//PSæ’ç¨‹
 void *PS_scheduler(void *arg) {
     int finished_processes = 0;
 
     while (finished_processes < N) {
         pthread_mutex_lock(&queue_mutex);
 
-        // ªÅ¦î¦C¥B©|¥¼´£¥æ§¹¦¨®É CPU µ¥«İ
+        // ç©ºä½‡åˆ—ä¸”å°šæœªæäº¤å®Œæˆæ™‚ CPU ç­‰å¾…
         while (q_front == q_rear && !all_processes_submitted && finished_processes < N) {
             pthread_mutex_unlock(&queue_mutex);
             pthread_mutex_lock(&proc_info_mutex);
             if (g_index < MAX_TIME) {
-                gantt_chart[g_index++] = -1; // CPU idle ¶¢¸m
+                gantt_chart[g_index++] = -1; // CPU idle é–’ç½®
                 current_time++;
             }
             pthread_mutex_unlock(&proc_info_mutex);
@@ -94,7 +94,7 @@ void *PS_scheduler(void *arg) {
             break;
         }
 
-        //Queue¬°ªÅ
+        //Queueç‚ºç©º
         if (q_front == q_rear) {
             pthread_mutex_unlock(&queue_mutex);
             continue;
@@ -103,21 +103,22 @@ void *PS_scheduler(void *arg) {
         int highest_pos = find_highest_priority_process();
         int current_proc_idx = ready_queue[highest_pos];
 
-        // ²¾°£¸Óµ{§Ç
+        // ç§»é™¤è©²ç¨‹åº
         for (int i = highest_pos; i < q_rear - 1; i++) {
             ready_queue[i] = ready_queue[i + 1];
         }
         q_rear--;
 
-        process *p = &procInfo[current_proc_idx];// ¨ú±o«ü¦V¸Ó process ªº«ü¼Ğ
+        process *p = &procInfo[current_proc_idx];// å–å¾—æŒ‡å‘è©² process çš„æŒ‡æ¨™
 
-        printf("®É¨è %2d ", current_time);
+        printf("æ™‚åˆ» %2d ", current_time);
         setColor(6);
-        printf("Process %d ¶}©l°õ¦æ (»İ­n %d ²@¬í, Àu¥ıÅv %d)\n", p->pid, p->burst, p->priority);
+        printf("Process %d é–‹å§‹åŸ·è¡Œ (éœ€è¦ %d æ¯«ç§’, å„ªå…ˆæ¬Š %d)\n", p->pid, p->burst, p->priority);
         setColor(7);
 
         pthread_mutex_unlock(&queue_mutex);
-
+        
+        //æ›´æ–°ç”˜ç‰¹åœ–
         for (int i = 0; i < p->burst; i++) {
             pthread_mutex_lock(&proc_info_mutex);
             if (g_index < MAX_TIME){
@@ -135,9 +136,9 @@ void *PS_scheduler(void *arg) {
         finished_processes++;
         pthread_mutex_unlock(&proc_info_mutex);
 
-        printf("®É¨è %2d ", finish_time);
+        printf("æ™‚åˆ» %2d ", finish_time);
         setColor(12);
-        printf("Process %d µ²§ô°õ¦æ\n", p->pid);
+        printf("Process %d çµæŸåŸ·è¡Œ\n", p->pid);
         setColor(7);
     }
 
@@ -175,9 +176,9 @@ void *process_arrival_simulator(void *arg) {
 
         pthread_mutex_lock(&queue_mutex);
         ready_queue[q_rear++] = proc_idx;
-        printf("®É¨è %2d ", procInfo[proc_idx].arrival);
+        printf("æ™‚åˆ» %2d ", procInfo[proc_idx].arrival);
         setColor(10);
-        printf("Process %d ¥[¤J Ready Queue: ", procInfo[proc_idx].pid);
+        printf("Process %d åŠ å…¥ Ready Queue: ", procInfo[proc_idx].pid);
         setColor(7);
         printQueue();
         printf("\n");
@@ -211,13 +212,13 @@ int main() {
 
     for (int i = 0; i < MAX_TIME; i++) gantt_chart[i] = -1;
 
-    printf("********** %d ­Óµ{§Çªº CPU ±Æµ{¼ÒÀÀµ{¦¡ ************\n\n", N);
-    printf("========== °õ¦æ PS ±Æµ{¾÷¨î (¦h°õ¦æºü) ==========\n\n");
-    setColor(10); printf("ºñ¦â¡G¥[¤J Ready Queue\n");
-    setColor(6);  printf("¶À¦â¡G¨Ï¥Î CPU\n");
-    setColor(12); printf("¬õ¦â¡GÂ÷¶} CPU\n\n");
+    printf("********** %d å€‹ç¨‹åºçš„ CPU æ’ç¨‹æ¨¡æ“¬ç¨‹å¼ ************\n\n", N);
+    printf("========== åŸ·è¡Œ PS æ’ç¨‹æ©Ÿåˆ¶ (å¤šåŸ·è¡Œç·’) ==========\n\n");
+    setColor(10); printf("ç¶ è‰²ï¼šåŠ å…¥ Ready Queue\n");
+    setColor(6);  printf("é»ƒè‰²ï¼šä½¿ç”¨ CPU\n");
+    setColor(12); printf("ç´…è‰²ï¼šé›¢é–‹ CPU\n\n");
     setColor(7);  printf("-------------------------------------------------\n\n");
-    printf("-------------------©³¤UPS±Æµ{¾÷¨î----------------\n\n");
+    printf("-------------------åº•ä¸‹PSæ’ç¨‹æ©Ÿåˆ¶----------------\n\n");
 
     pthread_t cpu_thread, arrival_thread;
     pthread_create(&arrival_thread, NULL, process_arrival_simulator, NULL);
@@ -226,7 +227,7 @@ int main() {
     pthread_join(arrival_thread, NULL);
     pthread_join(cpu_thread, NULL);
 
-    // ±Æ§ÇÅã¥Ü²Î­pµ²ªG
+    // æ’åºé¡¯ç¤ºçµ±è¨ˆçµæœ
     process temp_procInfo[N];
     for (int i = 0; i < N; i++) temp_procInfo[i] = procInfo[i];
     for (int i = 0; i < N - 1; i++) {
@@ -238,8 +239,8 @@ int main() {
             }
         }
     }
-    printf("\n############## ¶}©l®É¨è %2d , µ²§ô®É¨è%2d ###########\n\n",0,current_time);
-    printf("\n================   PS ²Î­pµ²ªG   =================\n");
+    printf("\n############## é–‹å§‹æ™‚åˆ» %2d , çµæŸæ™‚åˆ»%2d ###########\n\n",0,current_time);
+    printf("\n================   PS çµ±è¨ˆçµæœ   =================\n");
     float total_wait = 0, total_turnaround = 0;
     printf("PID  |  Waiting Time  |  Turnaround Time\n");
     for (int i = 0; i < N; i++) {
@@ -248,7 +249,7 @@ int main() {
         total_turnaround += temp_procInfo[i].turnaround;
     }
 
-    printf("\n=============== ¥Ì¯S¹Ï Gantt Chart ===============\n");
+    printf("\n=============== ç”˜ç‰¹åœ– Gantt Chart ===============\n");
     int start = 0;
     for (int i = 1; i <= g_index; i++) {
         if (i == g_index || gantt_chart[i] != gantt_chart[i - 1]) {
@@ -264,9 +265,9 @@ int main() {
         }
     }
 
-    printf("\n¥­§¡µ¥«İ®É¶¡¡G%.2f ms\n", total_wait / N);
-    printf("¥­§¡©PÂà®É¶¡¡G%.2f ms\n", total_turnaround / N);
-    printf("Throughput¡G%.4f processes/ms\n", (float)N / current_time);
+    printf("\nå¹³å‡ç­‰å¾…æ™‚é–“ï¼š%.2f ms\n", total_wait / N);
+    printf("å¹³å‡å‘¨è½‰æ™‚é–“ï¼š%.2f ms\n", total_turnaround / N);
+    printf("Throughputï¼š%.4f processes/ms\n", (float)N / current_time);
 
     pthread_mutex_destroy(&queue_mutex);
     pthread_mutex_destroy(&proc_info_mutex);
